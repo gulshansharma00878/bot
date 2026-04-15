@@ -265,6 +265,15 @@ export class RiskManager {
     logger.info('RISK: Circuit breaker reset');
   }
 
+  getRiskConfig(): RiskConfig {
+    return { ...this.config };
+  }
+
+  updateRiskConfig(partial: Partial<RiskConfig>): void {
+    Object.assign(this.config, partial);
+    logger.info(`RISK: Config updated: ${JSON.stringify(partial)}`);
+  }
+
   private resetDailyIfNeeded(): void {
     const today = new Date().toISOString().slice(0, 10);
     if (today !== this.lastResetDate) {

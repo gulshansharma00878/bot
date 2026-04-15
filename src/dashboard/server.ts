@@ -10,6 +10,20 @@ import { COINGECKO_IDS } from '../data/feeds';
 
 export interface SymbolEntry { symbol: string; geckoId: string; }
 
+export interface BotSettings {
+  strategy: string;
+  maxRiskPerTrade: number;
+  maxDailyLoss: number;
+  maxLeverage: number;
+  defaultLeverage: number;
+  stopLossPercent: number;
+  takeProfitPercent: number;
+  trailingStopPercent: number;
+  tradingCapitalUsd: number;
+  loopIntervalMs: number;
+  tradeCooldownMs: number;
+}
+
 export interface DashboardState {
   config: BotConfig;
   executionEngine: ExecutionEngine;
@@ -20,7 +34,10 @@ export interface DashboardState {
   symbolEntries: SymbolEntry[];
   startTime: number;
   isRunning: boolean;
+  loopIntervalMs: number;
+  tradeCooldownMs: number;
   onSymbolsChanged?: (entries: SymbolEntry[]) => void;
+  onSettingsChanged?: (settings: Partial<BotSettings>) => void;
 }
 
 export class Dashboard {
@@ -264,6 +281,108 @@ export class Dashboard {
       }
       logger.info(`Symbol removed via dashboard: ${coin}`);
       res.json({ symbols: this.state.symbols, symbolEntries: this.state.symbolEntries });
+    });
+
+    // API: get all settings
+    this.app.get('/api/settings', (_req, res) => {
+      const risk = this.state.riskManager.getRiskConfig();
+      const strategies = this.state.strategyEngine.getStrategyNames();
+      res.json({
+        strategy: this.state.config.defaultStrategy,
+        strategies,
+        maxRiskPerTrade: risk.maxRiskPerTrade,
+        maxDailyLoss: risk.maxDailyLoss,
+        maxLeverage: risk.maxLeverage,
+        defaultLeverage: risk.defaultLeverage,
+        stopLossPercent: risk.stopLossPercent,
+        takeProfitPercent: risk.takeProfitPercent,
+        trailingStopPercent: risk.trailingStopPercent,
+        tradingCapitalUsd: this.state.config.tradingCapitalUsd,
+        loopIntervalMs: this.state.loopIntervalMs,
+        tradeCooldownMs: this.state.tradeCooldownMs,
+        tradingMode: this.state.config.tradingMode,
+      });
+    });
+
+    // API: update settings
+    this.app.put('/api/settings', (req, res) => {
+      const body = req.body;
+      if (!body || typeof body !== 'object') {
+        res.status(400).json({ error: 'Invalid body' });
+        return;
+      }
+
+      const updates: Partial<BotSettings> = {};
+      const riskUpdates: Record<string, number> = {};
+
+      // Validate and collect changes
+      if (body.strategy !== undefined && typeof body.strategy === 'string') {
+        const strategies = this.state.strategyEngine.getStrategyNames();
+        if (!strategies.includes(body.strategy)) {
+          res.status(400).json({ error: `Unknown strategy: ${body.strategy}. Available: ${strategies.join(', ')}` });
+          return;
+        }
+        updates.strategy = body.strategy;
+      }
+
+      const numericFields: Array<{ key: keyof BotSettings; min: number; max: number; isRisk?: boolean }> = [
+        { key: 'maxRiskPerTrade', min: 0.001, max: 0.5, isRisk: true },
+        { key: 'maxDailyLoss', min: 0.01, max: 1.0, isRisk: true },
+        { key: 'maxLeverage', min: 1, max: 100, isRisk: true },
+        { key: 'defaultLeverage', min: 1, max: 100, isRisk: true },
+        { key: 'stopLossPercent', min: 0.001, max: 0.5, isRisk: true },
+        { key: 'takeProfitPercent', min: 0.001, max: 1.0, isRisk: true },
+        { key: 'trailingStopPercent', min: 0.001, max: 0.5, isRisk: true },
+        { key: 'tradingCapitalUsd', min: 1, max: 10000000 },
+        { key: 'loopIntervalMs', min: 10000, max: 3600000 },
+        { key: 'tradeCooldownMs', min: 0, max: 86400000 },
+      ];
+
+      for (const field of numericFields) {
+        if (body[field.key] !== undefined) {
+          const val = parseFloat(body[field.key]);
+          if (isNaN(val) || val < field.min || val > field.max) {
+            res.status(400).json({ error: `${field.key} must be between ${field.min} and ${field.max}` });
+            return;
+          }
+          (updates as any)[field.key] = val;
+          if (field.isRisk) riskUpdates[field.key] = val;
+        }
+      }
+
+      // Apply changes
+      if (updates.strategy) {
+        this.state.strategyEngine.switchStrategy(updates.strategy as any);
+        this.state.config.defaultStrategy = updates.strategy;
+      }
+      if (Object.keys(riskUpdates).length > 0) {
+        this.state.riskManager.updateRiskConfig(riskUpdates as any);
+        Object.assign(this.state.config.risk, riskUpdates);
+      }
+      if (updates.tradingCapitalUsd !== undefined) {
+        this.state.config.tradingCapitalUsd = updates.tradingCapitalUsd;
+        this.state.riskManager.updateCapital(updates.tradingCapitalUsd);
+      }
+      if (updates.loopIntervalMs !== undefined) {
+        this.state.loopIntervalMs = updates.loopIntervalMs;
+      }
+      if (updates.tradeCooldownMs !== undefined) {
+        this.state.tradeCooldownMs = updates.tradeCooldownMs;
+      }
+
+      if (this.state.onSettingsChanged) {
+        this.state.onSettingsChanged(updates);
+      }
+
+      logger.info(`Settings updated via dashboard: ${JSON.stringify(updates)}`);
+      res.json({ ok: true, applied: updates });
+    });
+
+    // API: reset circuit breaker
+    this.app.post('/api/reset-circuit-breaker', (_req, res) => {
+      this.state.riskManager.resetCircuitBreaker();
+      logger.info('Circuit breaker reset via dashboard');
+      res.json({ ok: true });
     });
   }
 

@@ -297,6 +297,80 @@ export function getDashboardHTML(): string {
     margin-left: 8px;
     transition: opacity 0.3s;
   }
+
+  /* Settings Panel */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .setting-group {
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .setting-group h4 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #38bdf8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+  .setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #1e293b;
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-row label {
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  .setting-row input, .setting-row select {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: #e1e8f0;
+    font-size: 13px;
+    font-family: inherit;
+    width: 130px;
+    text-align: right;
+    outline: none;
+  }
+  .setting-row select { width: 150px; text-align: left; cursor: pointer; }
+  .setting-row input:focus, .setting-row select:focus { border-color: #38bdf8; }
+  .settings-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    align-items: center;
+  }
+  .btn {
+    border: none;
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .btn-primary { background: #1d4ed8; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { background: #334155; cursor: not-allowed; }
+  .btn-danger { background: #dc2626; color: #fff; }
+  .btn-danger:hover { background: #ef4444; }
+  .btn-secondary { background: #334155; color: #e1e8f0; }
+  .btn-secondary:hover { background: #475569; }
+  .settings-msg {
+    font-size: 12px;
+    transition: opacity 0.3s;
+  }
 </style>
 </head>
 <body>
@@ -461,6 +535,88 @@ export function getDashboardHTML(): string {
       <div class="value" id="cb-status">OK</div>
       <div class="sub">Trips when daily loss exceeds limit</div>
     </div>
+  </div>
+</div>
+
+<!-- Settings Panel -->
+<div class="section">
+  <h3>⚙ Bot Settings <span style="font-size:11px;color:#64748b;font-weight:400">(changes apply immediately)</span></h3>
+  <div class="settings-grid">
+    <div class="setting-group">
+      <h4>Strategy</h4>
+      <div class="setting-row">
+        <label>Active Strategy</label>
+        <select id="s-strategy"></select>
+      </div>
+    </div>
+    <div class="setting-group">
+      <h4>Capital</h4>
+      <div class="setting-row">
+        <label>Trading Capital (USD)</label>
+        <input id="s-capital" type="number" step="1" min="1" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <h4>Risk Management</h4>
+      <div class="setting-row">
+        <label>Max Risk / Trade</label>
+        <input id="s-maxRiskPerTrade" type="number" step="0.005" min="0.001" max="0.5" />
+      </div>
+      <div class="setting-row">
+        <label>Max Daily Loss</label>
+        <input id="s-maxDailyLoss" type="number" step="0.01" min="0.01" max="1" />
+      </div>
+      <div class="setting-row">
+        <label>Max Leverage</label>
+        <input id="s-maxLeverage" type="number" step="1" min="1" max="100" />
+      </div>
+      <div class="setting-row">
+        <label>Default Leverage</label>
+        <input id="s-defaultLeverage" type="number" step="1" min="1" max="100" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <h4>Trade Parameters</h4>
+      <div class="setting-row">
+        <label>Stop Loss %</label>
+        <input id="s-stopLossPercent" type="number" step="0.005" min="0.001" max="0.5" />
+      </div>
+      <div class="setting-row">
+        <label>Take Profit %</label>
+        <input id="s-takeProfitPercent" type="number" step="0.01" min="0.001" max="1" />
+      </div>
+      <div class="setting-row">
+        <label>Trailing Stop %</label>
+        <input id="s-trailingStopPercent" type="number" step="0.005" min="0.001" max="0.5" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <h4>Timing</h4>
+      <div class="setting-row">
+        <label>Loop Interval (sec)</label>
+        <input id="s-loopInterval" type="number" step="10" min="10" max="3600" />
+      </div>
+      <div class="setting-row">
+        <label>Trade Cooldown (min)</label>
+        <input id="s-cooldown" type="number" step="1" min="0" max="1440" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <h4>Controls</h4>
+      <div class="setting-row">
+        <label>Trading Mode</label>
+        <span id="s-mode" style="font-size:13px;font-weight:700;color:#f59e0b">-</span>
+      </div>
+      <div class="setting-row">
+        <label>Circuit Breaker</label>
+        <button class="btn btn-danger" onclick="resetCircuitBreaker()" id="s-cb-btn" style="width:130px;padding:4px 10px;font-size:12px">Reset</button>
+      </div>
+    </div>
+  </div>
+  <div class="settings-actions">
+    <button class="btn btn-primary" id="save-settings-btn" onclick="saveSettings()">Save Settings</button>
+    <button class="btn btn-secondary" onclick="loadSettings()">Reset to Current</button>
+    <span class="settings-msg" id="settings-msg"></span>
   </div>
 </div>
 
@@ -707,6 +863,97 @@ function drawChart(data) {
   ctx.fillStyle = grad;
   ctx.fill();
 }
+
+// ---- Settings Management ----
+let settingsLoaded = false;
+
+async function loadSettings() {
+  try {
+    const s = await fetchJSON('/api/settings');
+    // Strategy dropdown
+    const sel = $('s-strategy');
+    if (s.strategies && !settingsLoaded) {
+      sel.innerHTML = s.strategies.map(st =>
+        '<option value="' + st + '"' + (st === s.strategy ? ' selected' : '') + '>' + st.replace(/_/g, ' ') + '</option>'
+      ).join('');
+    } else {
+      sel.value = s.strategy;
+    }
+    $('s-capital').value = s.tradingCapitalUsd;
+    $('s-maxRiskPerTrade').value = s.maxRiskPerTrade;
+    $('s-maxDailyLoss').value = s.maxDailyLoss;
+    $('s-maxLeverage').value = s.maxLeverage;
+    $('s-defaultLeverage').value = s.defaultLeverage;
+    $('s-stopLossPercent').value = s.stopLossPercent;
+    $('s-takeProfitPercent').value = s.takeProfitPercent;
+    $('s-trailingStopPercent').value = s.trailingStopPercent;
+    $('s-loopInterval').value = Math.round(s.loopIntervalMs / 1000);
+    $('s-cooldown').value = Math.round(s.tradeCooldownMs / 60000);
+    $('s-mode').textContent = s.tradingMode.toUpperCase();
+    $('s-mode').style.color = s.tradingMode === 'live' ? '#dc2626' : '#f59e0b';
+    settingsLoaded = true;
+  } catch(e) {
+    console.error('Failed to load settings:', e);
+  }
+}
+
+function showSettingsMsg(msg, color) {
+  const el = $('settings-msg');
+  el.textContent = msg;
+  el.style.color = color || '#64748b';
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 4000);
+}
+
+async function saveSettings() {
+  const btn = $('save-settings-btn');
+  btn.disabled = true;
+  try {
+    const body = {
+      strategy: $('s-strategy').value,
+      tradingCapitalUsd: parseFloat($('s-capital').value),
+      maxRiskPerTrade: parseFloat($('s-maxRiskPerTrade').value),
+      maxDailyLoss: parseFloat($('s-maxDailyLoss').value),
+      maxLeverage: parseFloat($('s-maxLeverage').value),
+      defaultLeverage: parseFloat($('s-defaultLeverage').value),
+      stopLossPercent: parseFloat($('s-stopLossPercent').value),
+      takeProfitPercent: parseFloat($('s-takeProfitPercent').value),
+      trailingStopPercent: parseFloat($('s-trailingStopPercent').value),
+      loopIntervalMs: parseFloat($('s-loopInterval').value) * 1000,
+      tradeCooldownMs: parseFloat($('s-cooldown').value) * 60000,
+    };
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showSettingsMsg('Settings saved successfully', '#22c55e');
+      update();
+    } else {
+      showSettingsMsg(data.error || 'Failed to save', '#ef4444');
+    }
+  } catch(e) {
+    showSettingsMsg('Network error', '#ef4444');
+  }
+  btn.disabled = false;
+}
+
+async function resetCircuitBreaker() {
+  try {
+    const res = await fetch('/api/reset-circuit-breaker', { method: 'POST' });
+    if (res.ok) {
+      showSettingsMsg('Circuit breaker reset', '#22c55e');
+      update();
+    }
+  } catch(e) {
+    showSettingsMsg('Failed to reset', '#ef4444');
+  }
+}
+
+// Load settings once on page load
+loadSettings();
 
 // ---- Symbol Management ----
 let availableCoins = [];

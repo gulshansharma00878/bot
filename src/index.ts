@@ -21,9 +21,7 @@ const DEFAULT_SYMBOLS: SymbolEntry[] = [
     { symbol: 'LINK', geckoId: 'chainlink' },
     { symbol: 'ARB', geckoId: 'arbitrum' },
     { symbol: 'OP', geckoId: 'optimism' },
-    { symbol: 'BIO', geckoId: 'bio-protocol' },
-    { symbol: 'BASED', geckoId: 'based-markets' },
-    { symbol: 'HOOD', geckoId: 'robinhood' },
+    { symbol: 'BIO', geckoId: 'bio-protocol' }
 ];
 
 function loadSymbolEntries(): SymbolEntry[] {
@@ -124,6 +122,8 @@ class TradingBot {
       symbolEntries: this.symbolEntries,
       startTime: Date.now(),
       isRunning: this.isRunning,
+      loopIntervalMs: this.loopIntervalMs,
+      tradeCooldownMs: this.tradeCooldownMs,
       onSymbolsChanged: (entries: SymbolEntry[]) => {
         this.symbolEntries = entries;
         this.symbols = entries.map(e => e.symbol);
@@ -131,6 +131,17 @@ class TradingBot {
         this.dataAggregator.updateSymbols(this.symbols);
         saveSymbolEntries(entries);
         logger.info(`Symbols updated: ${this.symbols.join(', ')}`);
+      },
+      onSettingsChanged: (settings: any) => {
+        if (settings.loopIntervalMs !== undefined) {
+          this.loopIntervalMs = settings.loopIntervalMs;
+        }
+        if (settings.tradeCooldownMs !== undefined) {
+          this.tradeCooldownMs = settings.tradeCooldownMs;
+        }
+        if (settings.strategy !== undefined) {
+          this.strategyEngine.switchStrategy(settings.strategy);
+        }
       },
     }, parseInt(process.env.PORT || '3000', 10));
     dashboard.start();
