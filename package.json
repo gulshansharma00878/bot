@@ -5,10 +5,16 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build",
     "start": "ts-node -r tsconfig-paths/register src/index.ts",
     "start:live": "NODE_ENV=production ts-node -r tsconfig-paths/register src/index.ts --mode live",
     "start:paper": "ts-node -r tsconfig-paths/register src/index.ts --mode paper",
+    "start:dist": "node dist/index.js",
+    "start:dist:live": "NODE_ENV=production node dist/index.js --mode live",
     "backtest": "ts-node -r tsconfig-paths/register src/backtest/runner.ts",
+    "typecheck": "tsc --noEmit",
+    "logs": "tail -f logs/*.log",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [
