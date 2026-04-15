@@ -31,6 +31,15 @@ export interface RiskConfig {
   stopLossPercent: number;
   takeProfitPercent: number;
   trailingStopPercent: number;
+  confidenceThreshold: number;
+  maxConcurrentPositions: number;
+  highVolThreshold: number;
+  highVolLeverage: number;
+  medVolThreshold: number;
+  medVolLeverage: number;
+  lowVolThreshold: number;
+  lowVolLeverage: number;
+  minVolLeverage: number;
 }
 
 export interface BotConfig {
@@ -89,6 +98,15 @@ export function loadConfig(): BotConfig {
       stopLossPercent: parseFloat(process.env.STOP_LOSS_PERCENT || '0.03'),
       takeProfitPercent: parseFloat(process.env.TAKE_PROFIT_PERCENT || '0.06'),
       trailingStopPercent: parseFloat(process.env.TRAILING_STOP_PERCENT || '0.02'),
+      confidenceThreshold: parseFloat(process.env.CONFIDENCE_THRESHOLD || '0.55'),
+      maxConcurrentPositions: parseInt(process.env.MAX_CONCURRENT_POSITIONS || '5', 10),
+      highVolThreshold: parseFloat(process.env.HIGH_VOL_THRESHOLD || '0.05'),
+      highVolLeverage: parseFloat(process.env.HIGH_VOL_LEVERAGE || '2'),
+      medVolThreshold: parseFloat(process.env.MED_VOL_THRESHOLD || '0.03'),
+      medVolLeverage: parseFloat(process.env.MED_VOL_LEVERAGE || '3'),
+      lowVolThreshold: parseFloat(process.env.LOW_VOL_THRESHOLD || '0.01'),
+      lowVolLeverage: parseFloat(process.env.LOW_VOL_LEVERAGE || '5'),
+      minVolLeverage: parseFloat(process.env.MIN_VOL_LEVERAGE || '7'),
     },
     tradingCapitalUsd: parseFloat(process.env.TRADING_CAPITAL_USD || '10000'),
     logLevel: process.env.LOG_LEVEL || 'info',

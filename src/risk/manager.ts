@@ -38,10 +38,10 @@ export class RiskManager {
       return null;
     }
 
-    // Max concurrent positions (limit to 5)
+    // Max concurrent positions
     const activePositions = openPositions.filter((p) => p.status === 'open');
-    if (activePositions.length >= 5) {
-      logger.warn('RISK: Max concurrent positions reached (5)');
+    if (activePositions.length >= this.config.maxConcurrentPositions) {
+      logger.warn(`RISK: Max concurrent positions reached (${this.config.maxConcurrentPositions})`);
       return null;
     }
 
@@ -55,8 +55,8 @@ export class RiskManager {
     }
 
     // Confidence threshold — higher bar reduces trade frequency but improves quality
-    if (signal.confidence < 0.55) {
-      logger.debug(`RISK: Signal confidence too low (${signal.confidence.toFixed(2)})`);
+    if (signal.confidence < this.config.confidenceThreshold) {
+      logger.debug(`RISK: Signal confidence too low (${signal.confidence.toFixed(2)} < ${this.config.confidenceThreshold})`);
       return null;
     }
 
@@ -109,11 +109,11 @@ export class RiskManager {
 
     if (atr > 0 && currentPrice > 0) {
       const volatilityPercent = atr / currentPrice;
-      // High vol (>5%) → low leverage; Low vol (<1%) → higher leverage
-      if (volatilityPercent > 0.05) leverage = 2;
-      else if (volatilityPercent > 0.03) leverage = 3;
-      else if (volatilityPercent > 0.01) leverage = 5;
-      else leverage = 7;
+      // Volatility-based leverage reduction (configurable thresholds)
+      if (volatilityPercent > this.config.highVolThreshold) leverage = this.config.highVolLeverage;
+      else if (volatilityPercent > this.config.medVolThreshold) leverage = this.config.medVolLeverage;
+      else if (volatilityPercent > this.config.lowVolThreshold) leverage = this.config.lowVolLeverage;
+      else leverage = this.config.minVolLeverage;
     }
 
     // Scale by confidence

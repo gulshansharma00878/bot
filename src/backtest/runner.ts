@@ -150,6 +150,15 @@ async function runBacktest(): Promise<void> {
     stopLossPercent: 0.03,
     takeProfitPercent: 0.06,
     trailingStopPercent: 0.02,
+    confidenceThreshold: 0.55,
+    maxConcurrentPositions: 5,
+    highVolThreshold: 0.05,
+    highVolLeverage: 2,
+    medVolThreshold: 0.03,
+    medVolLeverage: 3,
+    lowVolThreshold: 0.01,
+    lowVolLeverage: 5,
+    minVolLeverage: 7,
   };
 
   console.log('Fetching historical data...');

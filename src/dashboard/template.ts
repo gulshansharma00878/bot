@@ -574,6 +574,14 @@ export function getDashboardHTML(): string {
         <label>Default Leverage</label>
         <input id="s-defaultLeverage" type="number" step="1" min="1" max="100" />
       </div>
+      <div class="setting-row">
+        <label>Confidence Threshold</label>
+        <input id="s-confidenceThreshold" type="number" step="0.05" min="0.1" max="1" />
+      </div>
+      <div class="setting-row">
+        <label>Max Concurrent Positions</label>
+        <input id="s-maxConcurrentPositions" type="number" step="1" min="1" max="20" />
+      </div>
     </div>
     <div class="setting-group">
       <h4>Trade Parameters</h4>
@@ -599,6 +607,37 @@ export function getDashboardHTML(): string {
       <div class="setting-row">
         <label>Trade Cooldown (min)</label>
         <input id="s-cooldown" type="number" step="1" min="0" max="1440" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <h4>Volatility Leverage</h4>
+      <div class="setting-row">
+        <label>High Vol Threshold</label>
+        <input id="s-highVolThreshold" type="number" step="0.01" min="0.001" max="0.5" />
+      </div>
+      <div class="setting-row">
+        <label>High Vol Leverage</label>
+        <input id="s-highVolLeverage" type="number" step="1" min="1" max="100" />
+      </div>
+      <div class="setting-row">
+        <label>Med Vol Threshold</label>
+        <input id="s-medVolThreshold" type="number" step="0.01" min="0.001" max="0.5" />
+      </div>
+      <div class="setting-row">
+        <label>Med Vol Leverage</label>
+        <input id="s-medVolLeverage" type="number" step="1" min="1" max="100" />
+      </div>
+      <div class="setting-row">
+        <label>Low Vol Threshold</label>
+        <input id="s-lowVolThreshold" type="number" step="0.01" min="0.001" max="0.5" />
+      </div>
+      <div class="setting-row">
+        <label>Low Vol Leverage</label>
+        <input id="s-lowVolLeverage" type="number" step="1" min="1" max="100" />
+      </div>
+      <div class="setting-row">
+        <label>Min Vol Leverage</label>
+        <input id="s-minVolLeverage" type="number" step="1" min="1" max="100" />
       </div>
     </div>
     <div class="setting-group">
@@ -887,6 +926,15 @@ async function loadSettings() {
     $('s-stopLossPercent').value = s.stopLossPercent;
     $('s-takeProfitPercent').value = s.takeProfitPercent;
     $('s-trailingStopPercent').value = s.trailingStopPercent;
+    $('s-confidenceThreshold').value = s.confidenceThreshold;
+    $('s-maxConcurrentPositions').value = s.maxConcurrentPositions;
+    $('s-highVolThreshold').value = s.highVolThreshold;
+    $('s-highVolLeverage').value = s.highVolLeverage;
+    $('s-medVolThreshold').value = s.medVolThreshold;
+    $('s-medVolLeverage').value = s.medVolLeverage;
+    $('s-lowVolThreshold').value = s.lowVolThreshold;
+    $('s-lowVolLeverage').value = s.lowVolLeverage;
+    $('s-minVolLeverage').value = s.minVolLeverage;
     $('s-loopInterval').value = Math.round(s.loopIntervalMs / 1000);
     $('s-cooldown').value = Math.round(s.tradeCooldownMs / 60000);
     $('s-mode').textContent = s.tradingMode.toUpperCase();
@@ -919,6 +967,15 @@ async function saveSettings() {
       stopLossPercent: parseFloat($('s-stopLossPercent').value),
       takeProfitPercent: parseFloat($('s-takeProfitPercent').value),
       trailingStopPercent: parseFloat($('s-trailingStopPercent').value),
+      confidenceThreshold: parseFloat($('s-confidenceThreshold').value),
+      maxConcurrentPositions: parseInt($('s-maxConcurrentPositions').value),
+      highVolThreshold: parseFloat($('s-highVolThreshold').value),
+      highVolLeverage: parseFloat($('s-highVolLeverage').value),
+      medVolThreshold: parseFloat($('s-medVolThreshold').value),
+      medVolLeverage: parseFloat($('s-medVolLeverage').value),
+      lowVolThreshold: parseFloat($('s-lowVolThreshold').value),
+      lowVolLeverage: parseFloat($('s-lowVolLeverage').value),
+      minVolLeverage: parseFloat($('s-minVolLeverage').value),
       loopIntervalMs: parseFloat($('s-loopInterval').value) * 1000,
       tradeCooldownMs: parseFloat($('s-cooldown').value) * 60000,
     };

@@ -19,6 +19,15 @@ export interface BotSettings {
   stopLossPercent: number;
   takeProfitPercent: number;
   trailingStopPercent: number;
+  confidenceThreshold: number;
+  maxConcurrentPositions: number;
+  highVolThreshold: number;
+  highVolLeverage: number;
+  medVolThreshold: number;
+  medVolLeverage: number;
+  lowVolThreshold: number;
+  lowVolLeverage: number;
+  minVolLeverage: number;
   tradingCapitalUsd: number;
   loopIntervalMs: number;
   tradeCooldownMs: number;
@@ -297,6 +306,15 @@ export class Dashboard {
         stopLossPercent: risk.stopLossPercent,
         takeProfitPercent: risk.takeProfitPercent,
         trailingStopPercent: risk.trailingStopPercent,
+        confidenceThreshold: risk.confidenceThreshold,
+        maxConcurrentPositions: risk.maxConcurrentPositions,
+        highVolThreshold: risk.highVolThreshold,
+        highVolLeverage: risk.highVolLeverage,
+        medVolThreshold: risk.medVolThreshold,
+        medVolLeverage: risk.medVolLeverage,
+        lowVolThreshold: risk.lowVolThreshold,
+        lowVolLeverage: risk.lowVolLeverage,
+        minVolLeverage: risk.minVolLeverage,
         tradingCapitalUsd: this.state.config.tradingCapitalUsd,
         loopIntervalMs: this.state.loopIntervalMs,
         tradeCooldownMs: this.state.tradeCooldownMs,
@@ -333,6 +351,15 @@ export class Dashboard {
         { key: 'stopLossPercent', min: 0.001, max: 0.5, isRisk: true },
         { key: 'takeProfitPercent', min: 0.001, max: 1.0, isRisk: true },
         { key: 'trailingStopPercent', min: 0.001, max: 0.5, isRisk: true },
+        { key: 'confidenceThreshold', min: 0.1, max: 1.0, isRisk: true },
+        { key: 'maxConcurrentPositions', min: 1, max: 20, isRisk: true },
+        { key: 'highVolThreshold', min: 0.001, max: 0.5, isRisk: true },
+        { key: 'highVolLeverage', min: 1, max: 100, isRisk: true },
+        { key: 'medVolThreshold', min: 0.001, max: 0.5, isRisk: true },
+        { key: 'medVolLeverage', min: 1, max: 100, isRisk: true },
+        { key: 'lowVolThreshold', min: 0.001, max: 0.5, isRisk: true },
+        { key: 'lowVolLeverage', min: 1, max: 100, isRisk: true },
+        { key: 'minVolLeverage', min: 1, max: 100, isRisk: true },
         { key: 'tradingCapitalUsd', min: 1, max: 10000000 },
         { key: 'loopIntervalMs', min: 10000, max: 3600000 },
         { key: 'tradeCooldownMs', min: 0, max: 86400000 },
