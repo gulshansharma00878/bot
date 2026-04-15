@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: dex-trade
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:dist:live
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRADING_MODE
+        sync: false
+      - key: PRIVATE_KEY
+        sync: false
+      - key: COINGECKO_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: TRADING_CAPITAL_USD
+        sync: false

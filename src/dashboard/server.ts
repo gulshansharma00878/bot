@@ -148,8 +148,8 @@ export class Dashboard {
   }
 
   start(): void {
-    this.app.listen(this.port, () => {
-      logger.info(`Dashboard running at http://localhost:${this.port}`);
+    this.app.listen(this.port, '0.0.0.0', () => {
+      logger.info(`Dashboard running at http://0.0.0.0:${this.port}`);
     });
   }
 

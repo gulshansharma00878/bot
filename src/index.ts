@@ -65,7 +65,7 @@ class TradingBot {
       symbols: this.symbols,
       startTime: Date.now(),
       isRunning: this.isRunning,
-    }, 3000);
+    }, parseInt(process.env.PORT || '3000', 10));
     dashboard.start();
 
     await this.notificationService.notifyAlert(
