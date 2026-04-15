@@ -93,6 +93,12 @@ export class ExecutionEngine {
     return this.assetCtxCache.get(coin);
   }
 
+  /** Returns all available perp coin names from Hyperliquid */
+  getAvailableCoins(): string[] {
+    if (!this.client || !this.metaLoaded) return [];
+    return this.client.getAvailableCoins();
+  }
+
   // =============================================
   // Open Position
   // =============================================

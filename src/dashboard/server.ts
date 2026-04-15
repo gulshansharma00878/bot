@@ -6,6 +6,9 @@ import { StrategyEngine } from '../strategy';
 import { MarketDataAggregator } from '../data/aggregator';
 import { BotConfig } from '../utils/config';
 import { getDashboardHTML } from './template';
+import { COINGECKO_IDS } from '../data/feeds';
+
+export interface SymbolEntry { symbol: string; geckoId: string; }
 
 export interface DashboardState {
   config: BotConfig;
@@ -14,8 +17,10 @@ export interface DashboardState {
   strategyEngine: StrategyEngine;
   dataAggregator: MarketDataAggregator;
   symbols: string[];
+  symbolEntries: SymbolEntry[];
   startTime: number;
   isRunning: boolean;
+  onSymbolsChanged?: (entries: SymbolEntry[]) => void;
 }
 
 export class Dashboard {
@@ -27,6 +32,7 @@ export class Dashboard {
     this.state = state;
     this.port = port;
     this.app = express();
+    this.app.use(express.json());
     this.setupRoutes();
   }
 
@@ -49,6 +55,7 @@ export class Dashboard {
         circuitBreaker: this.state.riskManager.isCircuitBreakerTripped(),
         uptimeSeconds: uptime,
         symbols: this.state.symbols,
+        symbolEntries: this.state.symbolEntries,
       });
     });
 
@@ -198,6 +205,65 @@ export class Dashboard {
       } catch {
         res.json({ connected: false });
       }
+    });
+
+    // API: get available Hyperliquid coins
+    this.app.get('/api/available-coins', (_req, res) => {
+      const coins = this.state.executionEngine.getAvailableCoins();
+      res.json(coins);
+    });
+
+    // API: add symbol
+    this.app.post('/api/symbols', (req, res) => {
+      const { symbol, geckoId } = req.body;
+      if (!symbol || typeof symbol !== 'string' || !geckoId || typeof geckoId !== 'string') {
+        res.status(400).json({ error: 'symbol and geckoId are both required' });
+        return;
+      }
+      const coin = symbol.toUpperCase().trim();
+      const gid = geckoId.toLowerCase().trim();
+      if (this.state.symbols.includes(coin)) {
+        res.status(409).json({ error: `${coin} is already being tracked` });
+        return;
+      }
+      // Validate against Hyperliquid available coins
+      const available = this.state.executionEngine.getAvailableCoins();
+      if (available.length > 0 && !available.includes(coin)) {
+        res.status(400).json({ error: `${coin} is not available on Hyperliquid` });
+        return;
+      }
+      // Register the CoinGecko mapping
+      COINGECKO_IDS[coin] = gid;
+      const entry: SymbolEntry = { symbol: coin, geckoId: gid };
+      this.state.symbols.push(coin);
+      this.state.symbolEntries.push(entry);
+      if (this.state.onSymbolsChanged) {
+        this.state.onSymbolsChanged([...this.state.symbolEntries]);
+      }
+      logger.info(`Symbol added via dashboard: ${coin} (geckoId: ${gid})`);
+      res.json({ symbols: this.state.symbols, symbolEntries: this.state.symbolEntries });
+    });
+
+    // API: remove symbol
+    this.app.delete('/api/symbols/:symbol', (req, res) => {
+      const coin = req.params.symbol.toUpperCase().trim();
+      const idx = this.state.symbols.indexOf(coin);
+      if (idx === -1) {
+        res.status(404).json({ error: `${coin} is not being tracked` });
+        return;
+      }
+      // Don't allow removing last symbol
+      if (this.state.symbols.length <= 1) {
+        res.status(400).json({ error: 'Cannot remove the last symbol' });
+        return;
+      }
+      this.state.symbols.splice(idx, 1);
+      this.state.symbolEntries = this.state.symbolEntries.filter(e => e.symbol !== coin);
+      if (this.state.onSymbolsChanged) {
+        this.state.onSymbolsChanged([...this.state.symbolEntries]);
+      }
+      logger.info(`Symbol removed via dashboard: ${coin}`);
+      res.json({ symbols: this.state.symbols, symbolEntries: this.state.symbolEntries });
     });
   }
 

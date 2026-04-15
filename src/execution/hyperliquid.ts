@@ -165,6 +165,10 @@ export class HyperliquidClient {
 
   // ---- Info endpoints (no auth) ----
 
+  getAvailableCoins(): string[] {
+    return Array.from(this.nameToAsset.keys());
+  }
+
   async loadMeta(): Promise<HlMeta> {
     const res = await this.http.post('/info', { type: 'meta' });
     this.meta = res.data;

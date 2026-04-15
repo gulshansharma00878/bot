@@ -8,6 +8,57 @@ import { NotificationService } from './notifications/service';
 import { Dashboard } from './dashboard/server';
 import { StrategyName, Position, TradeSignal } from './utils/types';
 import { sleep } from './utils/helpers';
+import * as fs from 'fs';
+import * as path from 'path';
+import { COINGECKO_IDS } from './data/feeds';
+
+interface SymbolEntry { symbol: string; geckoId: string; }
+
+const SYMBOLS_FILE = path.join(__dirname, '..', 'data', 'symbols.json');
+const DEFAULT_SYMBOLS: SymbolEntry[] = [
+    { symbol: 'ETH', geckoId: 'ethereum' },
+    { symbol: 'SOL', geckoId: 'solana' },
+    { symbol: 'LINK', geckoId: 'chainlink' },
+    { symbol: 'ARB', geckoId: 'arbitrum' },
+    { symbol: 'OP', geckoId: 'optimism' },
+    { symbol: 'BIO', geckoId: 'bio-protocol' },
+    { symbol: 'BASED', geckoId: 'based-markets' },
+    { symbol: 'HOOD', geckoId: 'robinhood' },
+];
+
+function loadSymbolEntries(): SymbolEntry[] {
+  try {
+    if (fs.existsSync(SYMBOLS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SYMBOLS_FILE, 'utf-8'));
+      if (Array.isArray(data) && data.length > 0) {
+        // Support both old format (string[]) and new format (SymbolEntry[])
+        if (typeof data[0] === 'string') {
+          return data.map((s: string) => ({ symbol: s, geckoId: COINGECKO_IDS[s] || s.toLowerCase() }));
+        }
+        return data;
+      }
+    }
+  } catch (e) {
+    logger.warn(`Failed to load symbols file: ${e}`);
+  }
+  return [...DEFAULT_SYMBOLS];
+}
+
+function registerGeckoIds(entries: SymbolEntry[]): void {
+  for (const e of entries) {
+    if (e.geckoId) COINGECKO_IDS[e.symbol] = e.geckoId;
+  }
+}
+
+function saveSymbolEntries(entries: SymbolEntry[]): void {
+  try {
+    const dir = path.dirname(SYMBOLS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SYMBOLS_FILE, JSON.stringify(entries, null, 2));
+  } catch (e) {
+    logger.error(`Failed to save symbols: ${e}`);
+  }
+}
 
 class TradingBot {
   private config: BotConfig;
@@ -17,13 +68,17 @@ class TradingBot {
   private dataAggregator: MarketDataAggregator;
   private notificationService: NotificationService;
   private isRunning: boolean = false;
-  private symbols: string[] = ['ETH', 'SOL', 'ARB', 'LINK', 'DOGE', 'WIF'];
+  private symbols: string[];
+  private symbolEntries: SymbolEntry[];
   private loopIntervalMs: number = 60_000; // 1 minute main loop
   private lastTradeTime: Map<string, number> = new Map(); // Cooldown per symbol
   private tradeCooldownMs: number = 15 * 60_000; // 15 min between trades on same symbol
 
   constructor(config: BotConfig) {
     this.config = config;
+    this.symbolEntries = loadSymbolEntries();
+    registerGeckoIds(this.symbolEntries);
+    this.symbols = this.symbolEntries.map(e => e.symbol);
     this.strategyEngine = new StrategyEngine(config.defaultStrategy as StrategyName);
     this.riskManager = new RiskManager(config.risk, config.tradingCapitalUsd);
     this.executionEngine = new ExecutionEngine(config);
@@ -66,8 +121,17 @@ class TradingBot {
       strategyEngine: this.strategyEngine,
       dataAggregator: this.dataAggregator,
       symbols: this.symbols,
+      symbolEntries: this.symbolEntries,
       startTime: Date.now(),
       isRunning: this.isRunning,
+      onSymbolsChanged: (entries: SymbolEntry[]) => {
+        this.symbolEntries = entries;
+        this.symbols = entries.map(e => e.symbol);
+        registerGeckoIds(entries);
+        this.dataAggregator.updateSymbols(this.symbols);
+        saveSymbolEntries(entries);
+        logger.info(`Symbols updated: ${this.symbols.join(', ')}`);
+      },
     }, parseInt(process.env.PORT || '3000', 10));
     dashboard.start();
 

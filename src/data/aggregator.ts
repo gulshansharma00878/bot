@@ -77,4 +77,18 @@ export class MarketDataAggregator {
   getAllStates(): Map<string, MarketState> {
     return this.states;
   }
+
+  updateSymbols(symbols: string[]): void {
+    this.symbols = symbols;
+    // Remove states for symbols no longer tracked
+    for (const key of this.states.keys()) {
+      if (!symbols.includes(key)) {
+        this.states.delete(key);
+      }
+    }
+  }
+
+  getSymbols(): string[] {
+    return [...this.symbols];
+  }
 }

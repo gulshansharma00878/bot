@@ -3,3 +3,4 @@ dist/
 .env
 *.log
 backtest_results/
+data/

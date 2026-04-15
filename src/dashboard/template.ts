@@ -199,6 +199,104 @@ export function getDashboardHTML(): string {
     font-size: 11px;
     color: #475569;
   }
+
+  .symbols-manager {
+    padding: 0 24px 16px;
+  }
+  .symbols-manager h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #94a3b8;
+  }
+  .symbols-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .symbol-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #38bdf8;
+  }
+  .symbol-chip .remove-btn {
+    cursor: pointer;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1;
+    border: none;
+    background: none;
+    padding: 0 2px;
+    transition: color 0.15s;
+  }
+  .symbol-chip .remove-btn:hover { color: #ef4444; }
+  .add-symbol-form {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    position: relative;
+  }
+  .add-symbol-form input {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #e1e8f0;
+    font-size: 13px;
+    font-family: inherit;
+    width: 120px;
+    outline: none;
+  }
+  .add-symbol-form input:focus { border-color: #38bdf8; }
+  .add-symbol-form button {
+    background: #1d4ed8;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .add-symbol-form button:hover { background: #2563eb; }
+  .add-symbol-form button:disabled { background: #334155; cursor: not-allowed; }
+  .autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #111827;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    width: 200px;
+    z-index: 100;
+    display: none;
+    margin-top: 4px;
+  }
+  .autocomplete-list.show { display: block; }
+  .autocomplete-item {
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #e1e8f0;
+  }
+  .autocomplete-item:hover { background: #1e293b; }
+  .symbol-msg {
+    font-size: 12px;
+    margin-left: 8px;
+    transition: opacity 0.3s;
+  }
 </style>
 </head>
 <body>
@@ -216,6 +314,21 @@ export function getDashboardHTML(): string {
 <div class="refresh-bar">
   <span>Network: <strong id="network">-</strong> | Strategy: <strong id="strategy">-</strong></span>
   <span>Auto-refresh every 5s | Last update: <span id="last-update">-</span></span>
+</div>
+
+<!-- Symbol Manager -->
+<div class="symbols-manager">
+  <h3>Tracked Symbols</h3>
+  <div class="symbols-bar">
+    <div id="symbol-chips"></div>
+    <div class="add-symbol-form">
+      <input type="text" id="add-symbol-input" placeholder="Symbol (e.g. DOGE)" autocomplete="off" />
+      <input type="text" id="add-gecko-input" placeholder="CoinGecko ID (e.g. dogecoin)" autocomplete="off" />
+      <button id="add-symbol-btn" onclick="addSymbol()">+ Add</button>
+      <div class="autocomplete-list" id="autocomplete-list"></div>
+    </div>
+    <span class="symbol-msg" id="symbol-msg"></span>
+  </div>
 </div>
 
 <!-- KPI Cards -->
@@ -418,6 +531,7 @@ async function update() {
     $('trade-count').textContent = risk.totalTrades + ' trades';
     $('open-count').textContent = positions.length;
     $('symbols-tracked').textContent = status.symbols.join(', ');
+    renderSymbolChips(status.symbolEntries || status.symbols.map(s => ({symbol:s,geckoId:s.toLowerCase()})));
 
     // Prices (enriched with HL data)
     const pg = $('prices-grid');
@@ -592,6 +706,127 @@ function drawChart(data) {
   grad.addColorStop(1, lineColor + '05');
   ctx.fillStyle = grad;
   ctx.fill();
+}
+
+// ---- Symbol Management ----
+let availableCoins = [];
+let currentSymbols = [];
+let currentEntries = [];
+
+async function loadAvailableCoins() {
+  try { availableCoins = await fetchJSON('/api/available-coins'); } catch(e) {}
+}
+loadAvailableCoins();
+
+function renderSymbolChips(entries) {
+  currentEntries = entries;
+  currentSymbols = entries.map(e => e.symbol);
+  const container = $('symbol-chips');
+  if (!container) return;
+  container.innerHTML = entries.map(e =>
+    '<span class="symbol-chip">' + e.symbol +
+    '<span style="color:#64748b;font-weight:400;font-size:11px;margin-left:4px">(' + e.geckoId + ')</span>' +
+    (entries.length > 1 ? ' <button class="remove-btn" onclick="removeSymbol(\\''+e.symbol+'\\')">✕</button>' : '') +
+    '</span>'
+  ).join('');
+}
+
+function showSymbolMsg(msg, color) {
+  const el = $('symbol-msg');
+  el.textContent = msg;
+  el.style.color = color || '#64748b';
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 3000);
+}
+
+async function addSymbol() {
+  const symbolInput = $('add-symbol-input');
+  const geckoInput = $('add-gecko-input');
+  const symbol = symbolInput.value.toUpperCase().trim();
+  const geckoId = geckoInput.value.toLowerCase().trim();
+  if (!symbol || !geckoId) {
+    showSymbolMsg('Both symbol and CoinGecko ID required', '#ef4444');
+    return;
+  }
+  const btn = $('add-symbol-btn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/symbols', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, geckoId })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      renderSymbolChips(data.symbolEntries);
+      symbolInput.value = '';
+      geckoInput.value = '';
+      showSymbolMsg(symbol + ' added', '#22c55e');
+      hideAutocomplete();
+      update();
+    } else {
+      showSymbolMsg(data.error || 'Failed', '#ef4444');
+    }
+  } catch(e) {
+    showSymbolMsg('Network error', '#ef4444');
+  }
+  btn.disabled = false;
+}
+
+async function removeSymbol(symbol) {
+  try {
+    const res = await fetch('/api/symbols/' + encodeURIComponent(symbol), { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok) {
+      renderSymbolChips(data.symbolEntries);
+      showSymbolMsg(symbol + ' removed', '#f59e0b');
+      update();
+    } else {
+      showSymbolMsg(data.error || 'Failed', '#ef4444');
+    }
+  } catch(e) {
+    showSymbolMsg('Network error', '#ef4444');
+  }
+}
+
+// Autocomplete
+const acInput = $('add-symbol-input');
+const acList = $('autocomplete-list');
+
+acInput.addEventListener('input', function() {
+  const val = this.value.toUpperCase().trim();
+  if (!val) { hideAutocomplete(); return; }
+  const filtered = availableCoins
+    .filter(c => c.toUpperCase().includes(val) && !currentSymbols.includes(c))
+    .slice(0, 15);
+  if (filtered.length === 0) { hideAutocomplete(); return; }
+  acList.innerHTML = filtered.map(c =>
+    '<div class="autocomplete-item" onmousedown="selectAutocomplete(\\''+c+'\\')">'+c+'</div>'
+  ).join('');
+  acList.classList.add('show');
+});
+
+acInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); $('add-gecko-input').focus(); }
+  if (e.key === 'Escape') hideAutocomplete();
+});
+
+acInput.addEventListener('blur', function() {
+  setTimeout(hideAutocomplete, 150);
+});
+
+$('add-gecko-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); addSymbol(); }
+});
+
+function selectAutocomplete(coin) {
+  $('add-symbol-input').value = coin;
+  hideAutocomplete();
+  $('add-gecko-input').focus();
+}
+
+function hideAutocomplete() {
+  acList.classList.remove('show');
 }
 
 // Initial load + auto refresh

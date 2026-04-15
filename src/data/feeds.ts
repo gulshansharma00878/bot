@@ -13,7 +13,7 @@ const COINGECKO_BASE = COINGECKO_API_KEY
 const COINGECKO_HEADERS: Record<string, string> = COINGECKO_API_KEY
   ? { 'x-cg-pro-api-key': COINGECKO_API_KEY }
   : {};
-const COINGECKO_IDS: Record<string, string> = {
+export const COINGECKO_IDS: Record<string, string> = {
   'ETH': 'ethereum',
   'BTC': 'bitcoin',
   'ARB': 'arbitrum',
