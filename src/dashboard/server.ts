@@ -52,16 +52,22 @@ export class Dashboard {
       });
     });
 
-    // API: market prices
-    this.app.get('/api/prices', (_req, res) => {
+    // API: market prices (enriched with Hyperliquid data)
+    this.app.get('/api/prices', async (_req, res) => {
       const prices: Record<string, any> = {};
       for (const symbol of this.state.symbols) {
         const state = this.state.dataAggregator.getState(symbol);
+        const hlCtx = this.state.executionEngine.getAssetCtx(symbol);
         if (state) {
           prices[symbol] = {
-            price: state.price.price,
+            price: hlCtx ? parseFloat(hlCtx.markPx) : state.price.price,
+            oraclePrice: hlCtx ? parseFloat(hlCtx.oraclePx) : null,
             timestamp: state.price.timestamp,
-            fundingRate: state.fundingRate?.rate ?? null,
+            fundingRate: hlCtx ? parseFloat(hlCtx.funding) : (state.fundingRate?.rate ?? null),
+            openInterest: hlCtx ? parseFloat(hlCtx.openInterest) : null,
+            dayVolume: hlCtx ? parseFloat(hlCtx.dayNtlVlm) : null,
+            prevDayPx: hlCtx ? parseFloat(hlCtx.prevDayPx) : null,
+            premium: hlCtx?.premium ? parseFloat(hlCtx.premium) : null,
             longOI: state.openInterest?.longOI ?? null,
             shortOI: state.openInterest?.shortOI ?? null,
           };
@@ -132,18 +138,66 @@ export class Dashboard {
       const wins = trades.filter((t) => t.pnl > 0);
       const losses = trades.filter((t) => t.pnl <= 0);
       const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+      const totalFees = trades.reduce((s, t) => s + t.fees, 0);
+      const bestTrade = trades.length > 0 ? Math.max(...trades.map(t => t.pnl)) : 0;
+      const worstTrade = trades.length > 0 ? Math.min(...trades.map(t => t.pnl)) : 0;
 
       res.json({
         totalTrades: trades.length,
         winRate: trades.length > 0 ? wins.length / trades.length : 0,
         totalPnl,
+        totalFees,
+        bestTrade,
+        worstTrade,
         avgWin: wins.length > 0 ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0,
         avgLoss: losses.length > 0 ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0,
+        profitFactor: losses.length > 0
+          ? Math.abs(wins.reduce((s, t) => s + t.pnl, 0) / losses.reduce((s, t) => s + t.pnl, 0))
+          : wins.length > 0 ? Infinity : 0,
         circuitBreaker: this.state.riskManager.isCircuitBreakerTripped(),
         maxRiskPerTrade: this.state.config.risk.maxRiskPerTrade,
         maxDailyLoss: this.state.config.risk.maxDailyLoss,
         maxLeverage: this.state.config.risk.maxLeverage,
       });
+    });
+
+    // API: Hyperliquid account state (live balance, on-chain positions)
+    // Supports both classic and unified account modes
+    this.app.get('/api/account', async (_req, res) => {
+      try {
+        const balance = await this.state.executionEngine.getWalletBalance();
+        const state = await this.state.executionEngine.getAccountState();
+        if (!state) {
+          res.json({ connected: false });
+          return;
+        }
+        const perpVal = parseFloat(state.marginSummary.accountValue);
+        const isUnified = perpVal < 1 && balance >= 1;
+
+        const onChainPositions = state.assetPositions
+          .filter(ap => parseFloat(ap.position.szi) !== 0)
+          .map(ap => ({
+            coin: ap.position.coin,
+            size: ap.position.szi,
+            entryPx: ap.position.entryPx,
+            markPx: ap.position.positionValue,
+            unrealizedPnl: ap.position.unrealizedPnl,
+            leverage: ap.position.leverage,
+            liquidationPx: ap.position.liquidationPx,
+            marginUsed: ap.position.marginUsed,
+          }));
+        res.json({
+          connected: true,
+          accountMode: isUnified ? 'unified' : 'classic',
+          accountValue: balance.toFixed(2),
+          totalMarginUsed: state.marginSummary.totalMarginUsed,
+          withdrawable: isUnified ? balance.toFixed(2) : state.withdrawable,
+          totalNtlPos: state.marginSummary.totalNtlPos,
+          onChainPositions,
+        });
+      } catch {
+        res.json({ connected: false });
+      }
     });
   }
 

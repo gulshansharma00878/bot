@@ -1,35 +1,49 @@
-# DEX Perpetual Futures Trading Bot
+# Hyperliquid Perpetual Futures Trading Bot
 
-Production-ready perpetual futures trading bot for Ethereum Layer 2 networks (Arbitrum, Optimism, Base). Connects to GMX V2 and similar DEX perps protocols.
+Automated perpetual futures trading bot built for **Hyperliquid** — the highest-volume decentralized perpetual exchange with zero gas fees, 0.035% taker fees, and sub-second execution.
+
+## Why Hyperliquid?
+
+| Feature | Hyperliquid | GMX V2 | dYdX |
+|---------|------------|--------|------|
+| Gas/Keeper Fee | **$0** | ~$5/order | $0 |
+| Taker Fee | **0.035%** | 0.05%+ | 0.05% |
+| Execution Speed | **<1s** | ~30s | ~1s |
+| Pairs | **100+** | ~15 | ~60 |
+| Min Capital | **~$10** | ~$100 | ~$50 |
 
 ## Architecture
 
 ```
 src/
-├── index.ts              # Main entry point & bot orchestrator
-├── strategy/             # Trading strategies
-│   ├── base.ts           # Base strategy with indicator calculations
-│   ├── trendFollowing.ts # EMA crossover + volume + multi-TF
-│   ├── meanReversion.ts  # RSI + Bollinger Bands
-│   ├── fundingArbitrage.ts # Funding rate exploitation
-│   └── index.ts          # Strategy engine (manages all strategies)
+├── index.ts                  # Main entry point & bot orchestrator
 ├── execution/
-│   └── engine.ts         # Web3 execution, paper trading, nonce mgmt
+│   ├── engine.ts             # Position manager (open/close/track)
+│   └── hyperliquid.ts        # Hyperliquid API client (signing, REST)
+├── strategy/
+│   ├── base.ts               # Base strategy with indicator calculations
+│   ├── trendFollowing.ts     # EMA crossover + trend continuation
+│   ├── meanReversion.ts      # RSI + Bollinger Bands
+│   ├── fundingArbitrage.ts   # Funding rate exploitation (disabled)
+│   └── index.ts              # Strategy engine
 ├── risk/
-│   └── manager.ts        # Position sizing, SL/TP, circuit breaker
+│   └── manager.ts            # Position sizing, SL/TP, circuit breaker
 ├── data/
-│   ├── feeds.ts          # CoinGecko price feeds, OHLCV, funding
-│   └── aggregator.ts     # Multi-symbol data aggregation
+│   ├── feeds.ts              # CoinGecko price feeds, OHLCV
+│   └── aggregator.ts         # Multi-symbol data aggregation
+├── dashboard/
+│   ├── server.ts             # Express web dashboard API
+│   └── template.ts           # Real-time dashboard UI
 ├── backtest/
-│   ├── engine.ts         # Backtest simulation engine
-│   └── runner.ts         # CLI runner, CSV export, charts
+│   ├── engine.ts             # Backtest simulation engine
+│   └── runner.ts             # CLI runner with CSV export
 ├── notifications/
-│   └── service.ts        # Telegram + Discord alerts
+│   └── service.ts            # Telegram + Discord alerts
 └── utils/
-    ├── config.ts         # Environment config loader
-    ├── types.ts          # TypeScript type definitions
-    ├── logger.ts         # Winston structured logging
-    └── helpers.ts        # Utilities (retry, formatting, etc.)
+    ├── config.ts             # Environment config loader
+    ├── types.ts              # TypeScript type definitions
+    ├── logger.ts             # Winston structured logging
+    └── helpers.ts            # Utilities (retry, formatting)
 ```
 
 ## Quick Start
@@ -42,12 +56,18 @@ npm install
 ### 2. Configure environment
 ```bash
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with your private key and settings
 ```
 
-### 3. Run backtest (no wallet needed)
+Key env vars:
+- `PRIVATE_KEY` — Your wallet private key (same key you use on Hyperliquid)
+- `TRADING_MODE` — `paper` (simulated) or `live` (real trades)
+- `TRADING_CAPITAL_USD` — Starting capital for position sizing (e.g., `40`)
+- `DEFAULT_NETWORK` — `hyperliquid` (default)
+
+### 3. Build
 ```bash
-npm run backtest
+npm run build
 ```
 
 ### 4. Paper trading (simulated, no real funds)
@@ -55,49 +75,107 @@ npm run backtest
 npm run start:paper
 ```
 
-### 5. Live trading (REAL FUNDS — use with caution)
+### 5. Live trading (REAL FUNDS)
 ```bash
 npm run start:live
 ```
 
-## Strategies
+### 6. Run from compiled JS (production)
+```bash
+npm run start:dist:live
+```
 
-### 1. Trend Following (`trend_following`)
-- **Entry**: EMA(9) crosses EMA(21) with above-average volume
-- **Filter**: Multi-timeframe alignment (1h, 4h, 1d must agree)
-- **Stop loss**: 2x ATR below/above entry
-- **Take profit**: 3x ATR from entry
-- **Best in**: Trending markets with clear directional momentum
+### 7. Backtest (no wallet needed)
+```bash
+npm run backtest
+```
 
-### 2. Mean Reversion (`mean_reversion`)
-- **Entry**: Price touches Bollinger Band + RSI at extremes + RSI turning
-- **Filter**: Skips signals that oppose the higher-timeframe trend
-- **Stop loss**: 1.5x ATR (tighter — mean reversion expects quick moves)
-- **Take profit**: Middle Bollinger Band (the mean)
-- **Best in**: Range-bound, choppy markets
+## Dashboard
 
-### 3. Funding Rate Arbitrage (`funding_arbitrage`)
-- **Entry**: Funding rate exceeds 0.05% threshold
-- **Logic**: Short when funding is highly positive (collect from longs), long when negative
-- **Confirmation**: Open interest imbalance must align
-- **Stop loss**: 3x ATR (wider — tolerates volatility to collect funding)
-- **Best in**: High funding regimes (liquidation cascades, one-sided positioning)
+The bot includes a real-time web dashboard at `http://localhost:3000` with:
+
+- **Live account balance** from Hyperliquid (account value, margin, withdrawable)
+- **Market prices** with 24h change, funding rates, volume, open interest
+- **Open positions** with entry, PnL, stop loss, take profit, liquidation price
+- **Equity curve** chart
+- **Trade history** table
+- **Risk metrics** — win rate, profit factor, best/worst trade, total fees
+- **Circuit breaker** status
+- Auto-refreshes every 5 seconds
+
+## Trading Strategies
+
+### 1. Trend Following (`trend_following`) — Active
+- EMA(9) crosses EMA(21) + trend continuation entries
+- Requires 1% EMA separation + price near fast EMA for pullback
+- Stop loss: 3x ATR | Take profit: 4.5x ATR
+- Best in: Trending markets
+
+### 2. Mean Reversion (`mean_reversion`) — Active
+- RSI extremes + Bollinger Band touch + RSI reversal
+- Stop loss: 1.5x ATR | Take profit: BB middle band
+- Best in: Range-bound, choppy markets
+
+### 3. Funding Arbitrage (`funding_arbitrage`) — Disabled
+- Disabled because the data feed uses simulated funding rates
+- Can be re-enabled when connected to real funding rate sources
 
 ## Risk Management
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| Max risk per trade | 2% | Maximum capital at risk per position |
-| Daily loss limit | 5% | Circuit breaker — halts trading for the day |
-| Max leverage | 10x | Hard cap on leverage |
-| Default leverage | 3x | Volatility-adjusted (lower vol → higher leverage) |
-| Stop loss | ATR-based | Dynamic, per strategy |
-| Trailing stop | 2% | Follows price to lock in profits |
-| Max positions | 5 | Concurrent open positions limit |
-| Position sizing | ATR-based | Size inversely proportional to volatility |
+| Max risk per trade | 2% | Capital at risk per position |
+| Daily loss limit | 5% | Circuit breaker halts all trading |
+| Max leverage | 10x | Hard cap |
+| Default leverage | 3x | Volatility-adjusted |
+| Stop loss | ATR-based | Dynamic per strategy |
+| Trailing stop | 2% | Follows price upward |
+| Max positions | 5 | Concurrent open positions |
+| Confidence threshold | 0.55 | Minimum signal quality |
+| Trade cooldown | 15 min | Per-symbol cooldown after close |
 
-### Circuit Breaker
-When daily PnL drops below the daily loss limit (-5% default), **all new trades are blocked** until the next calendar day. This prevents emotional/revenge trading and catastrophic drawdowns.
+## Cost Comparison ($40 capital, 5x leverage, $200 position)
+
+| | Round Trip Cost | Move to Breakeven |
+|---|---|---|
+| **Hyperliquid** | **$0.14** | **0.07%** |
+| Vertex | $0.20 | 0.10% |
+| gTrade | $0.32 | 0.16% |
+| GMX V2 | $5.25 | 2.50% |
+
+## Deployment on Render
+
+The repo includes a `render.yaml` blueprint:
+
+1. Create a **Web Service** on Render
+2. Connect your GitHub repo
+3. Build command: `npm install && npm run build`
+4. Start command: `npm run start:dist:live`
+5. Add env vars in Render dashboard: `PRIVATE_KEY`, `TRADING_MODE`, `TRADING_CAPITAL_USD`, etc.
+
+## Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run build` | Compile TypeScript |
+| `npm run clean` | Remove dist/ |
+| `npm run rebuild` | Clean + build |
+| `npm run start` | Run with ts-node |
+| `npm run start:live` | Live trading (ts-node) |
+| `npm run start:paper` | Paper trading (ts-node) |
+| `npm run start:dist` | Run compiled JS |
+| `npm run start:dist:live` | Run compiled JS in live mode |
+| `npm run backtest` | Run backtester |
+| `npm run typecheck` | Type-check without emit |
+| `npm run logs` | Tail log files |
+
+## Important Notes
+
+- **Bridge USDC to Hyperliquid** before live trading: Use the [Hyperliquid bridge](https://app.hyperliquid.xyz) to deposit USDC from Arbitrum
+- **Collateral is USDC** — Hyperliquid uses USDC as margin, not ETH
+- **Same private key** as your Hyperliquid wallet
+- **Paper mode** uses the same Hyperliquid API for market data but simulates trades locally
+- Logs are written to `logs/` directory
 
 ### Liquidation Monitoring
 Every cycle, the bot checks how close each position is to liquidation. If within 2% of the liquidation price, the position is auto-closed to prevent forced liquidation and associated penalties.

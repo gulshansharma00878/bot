@@ -4,7 +4,7 @@ export function getDashboardHTML(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DEX Trading Bot Dashboard</title>
+<title>Hyperliquid Trading Bot</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -204,7 +204,7 @@ export function getDashboardHTML(): string {
 <body>
 
 <div class="header">
-  <h1>⚡ DEX Perps Trading Bot</h1>
+  <h1>⚡ Hyperliquid Perps Trading Bot</h1>
   <div class="status">
     <span id="mode-badge" class="badge">-</span>
     <span id="status-badge" class="badge">-</span>
@@ -291,17 +291,56 @@ export function getDashboardHTML(): string {
   </div>
 </div>
 
+<!-- Hyperliquid Account -->
+<div class="section">
+  <h3>Hyperliquid Account</h3>
+  <div class="grid">
+    <div class="card">
+      <h2>Account Value</h2>
+      <div class="value blue" id="hl-account-value">-</div>
+      <div class="sub" id="hl-connection">Connecting...</div>
+    </div>
+    <div class="card">
+      <h2>Margin Used</h2>
+      <div class="value" id="hl-margin-used">-</div>
+      <div class="sub" id="hl-ntl-pos">-</div>
+    </div>
+    <div class="card">
+      <h2>Withdrawable</h2>
+      <div class="value green" id="hl-withdrawable">-</div>
+      <div class="sub">Available for withdrawal</div>
+    </div>
+    <div class="card">
+      <h2>On-Chain Positions</h2>
+      <div class="value" id="hl-positions-count">0</div>
+      <div class="sub" id="hl-positions-list">-</div>
+    </div>
+  </div>
+</div>
+
 <!-- Risk Panel -->
 <div class="section">
-  <h3>Risk Parameters</h3>
-  <div class="grid grid-wide">
+  <h3>Risk &amp; Performance</h3>
+  <div class="grid">
     <div class="card">
       <table>
         <tr><td style="color:#64748b">Max Risk/Trade</td><td id="r-max-risk" style="text-align:right">-</td></tr>
         <tr><td style="color:#64748b">Max Daily Loss</td><td id="r-max-daily" style="text-align:right">-</td></tr>
         <tr><td style="color:#64748b">Max Leverage</td><td id="r-max-lev" style="text-align:right">-</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <table>
+        <tr><td style="color:#64748b">Best Trade</td><td id="r-best" style="text-align:right;color:#22c55e">-</td></tr>
+        <tr><td style="color:#64748b">Worst Trade</td><td id="r-worst" style="text-align:right;color:#ef4444">-</td></tr>
+        <tr><td style="color:#64748b">Profit Factor</td><td id="r-pf" style="text-align:right">-</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <table>
         <tr><td style="color:#64748b">Avg Win</td><td id="r-avg-win" style="text-align:right;color:#22c55e">-</td></tr>
         <tr><td style="color:#64748b">Avg Loss</td><td id="r-avg-loss" style="text-align:right;color:#ef4444">-</td></tr>
+        <tr><td style="color:#64748b">Total Fees</td><td id="r-fees" style="text-align:right;color:#f59e0b">-</td></tr>
       </table>
     </div>
     <div class="card">
@@ -312,7 +351,7 @@ export function getDashboardHTML(): string {
   </div>
 </div>
 
-<div class="footer">DEX Perpetual Futures Trading Bot &mdash; Dashboard</div>
+<div class="footer">Hyperliquid Perpetual Futures Trading Bot &mdash; Zero Gas Fees</div>
 
 <script>
 const $ = (s) => document.getElementById(s);
@@ -337,13 +376,14 @@ async function fetchJSON(url) {
 
 async function update() {
   try {
-    const [status, prices, positions, trades, equity, risk] = await Promise.all([
+    const [status, prices, positions, trades, equity, risk, account] = await Promise.all([
       fetchJSON('/api/status'),
       fetchJSON('/api/prices'),
       fetchJSON('/api/positions'),
       fetchJSON('/api/trades'),
       fetchJSON('/api/equity'),
       fetchJSON('/api/risk'),
+      fetchJSON('/api/account'),
     ]);
 
     // Status
@@ -379,7 +419,7 @@ async function update() {
     $('open-count').textContent = positions.length;
     $('symbols-tracked').textContent = status.symbols.join(', ');
 
-    // Prices
+    // Prices (enriched with HL data)
     const pg = $('prices-grid');
     const symbols = Object.keys(prices);
     if (symbols.length === 0) {
@@ -389,10 +429,15 @@ async function update() {
         const p = prices[s];
         const fr = p.fundingRate;
         const frClass = fr > 0 ? 'green' : fr < 0 ? 'red' : '';
+        const change24h = p.prevDayPx ? ((p.price - p.prevDayPx) / p.prevDayPx * 100) : null;
+        const changeClass = change24h !== null ? (change24h >= 0 ? 'green' : 'red') : '';
+        const vol = p.dayVolume ? (p.dayVolume > 1e6 ? (p.dayVolume/1e6).toFixed(1) + 'M' : p.dayVolume.toFixed(0)) : '-';
+        const oi = p.openInterest ? (p.openInterest > 1e6 ? (p.openInterest/1e6).toFixed(1) + 'M' : p.openInterest.toFixed(0)) : '-';
         return '<div class="price-card">' +
-          '<div class="symbol">' + s + '</div>' +
+          '<div class="symbol">' + s + (change24h !== null ? ' <span class="' + changeClass + '" style="font-size:12px">' + (change24h >= 0 ? '+' : '') + change24h.toFixed(2) + '%</span>' : '') + '</div>' +
           '<div class="price">$' + p.price.toLocaleString(undefined,{maximumFractionDigits:2}) + '</div>' +
           '<div class="funding ' + frClass + '">Funding: ' + (fr !== null ? (fr * 100).toFixed(4) + '%' : 'N/A') + '</div>' +
+          '<div style="font-size:11px;color:#64748b;margin-top:4px">Vol: $' + vol + ' | OI: $' + oi + '</div>' +
           '</div>';
       }).join('');
     }
@@ -445,14 +490,36 @@ async function update() {
       }).join('');
     }
 
-    // Risk
+    // Risk & Performance
     $('r-max-risk').textContent = fmtPct(risk.maxRiskPerTrade);
     $('r-max-daily').textContent = fmtPct(risk.maxDailyLoss);
     $('r-max-lev').textContent = risk.maxLeverage + 'x';
     $('r-avg-win').textContent = risk.avgWin > 0 ? fmtUsd(risk.avgWin) : '-';
     $('r-avg-loss').textContent = risk.avgLoss < 0 ? fmtUsd(risk.avgLoss) : '-';
+    $('r-best').textContent = risk.bestTrade > 0 ? fmtUsd(risk.bestTrade) : '-';
+    $('r-worst').textContent = risk.worstTrade < 0 ? fmtUsd(risk.worstTrade) : '-';
+    $('r-pf').textContent = risk.profitFactor === Infinity ? '∞' : (risk.profitFactor > 0 ? risk.profitFactor.toFixed(2) : '-');
+    $('r-fees').textContent = risk.totalFees > 0 ? fmtUsd(risk.totalFees) : '-';
     $('cb-status').textContent = risk.circuitBreaker ? 'TRIPPED' : 'OK';
     $('cb-status').className = 'value ' + (risk.circuitBreaker ? 'red' : 'green');
+
+    // Hyperliquid Account
+    if (account.connected) {
+      $('hl-connection').textContent = 'Connected';
+      $('hl-connection').className = 'sub green';
+      $('hl-account-value').textContent = '$' + parseFloat(account.accountValue).toFixed(2);
+      $('hl-margin-used').textContent = '$' + parseFloat(account.totalMarginUsed).toFixed(2);
+      $('hl-ntl-pos').textContent = 'Net position: $' + parseFloat(account.totalNtlPos).toFixed(2);
+      $('hl-withdrawable').textContent = '$' + parseFloat(account.withdrawable).toFixed(2);
+      const hlPos = account.onChainPositions || [];
+      $('hl-positions-count').textContent = hlPos.length;
+      $('hl-positions-list').textContent = hlPos.length > 0
+        ? hlPos.map(p => p.coin + ': ' + p.size).join(', ')
+        : 'No on-chain positions';
+    } else {
+      $('hl-connection').textContent = 'Not connected';
+      $('hl-connection').className = 'sub red';
+    }
 
     // Equity chart
     drawChart(equity);

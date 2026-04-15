@@ -5,39 +5,21 @@ export interface NetworkConfig {
   name: string;
   chainId: number;
   rpcUrl: string;
-  gmxRouter: string;
-  gmxReader: string;
-  gmxDataStore: string;
-  gmxExchangeRouter: string;
+  exchange: string;
 }
 
 export const NETWORKS: Record<string, NetworkConfig> = {
+  hyperliquid: {
+    name: 'Hyperliquid',
+    chainId: 1337,
+    rpcUrl: 'https://api.hyperliquid.xyz',
+    exchange: 'hyperliquid',
+  },
   arbitrum: {
     name: 'Arbitrum One',
     chainId: 42161,
     rpcUrl: process.env.ARBITRUM_RPC || 'https://arb1.arbitrum.io/rpc',
-    gmxRouter: process.env.GMX_ROUTER || '0x7C68C7866A64FA2160F78EEaE12217FFbf871fa8',
-    gmxReader: process.env.GMX_READER || '0xf60becbba223EEA9495Da3f606753867eC10d139',
-    gmxDataStore: process.env.GMX_DATASTORE || '0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8',
-    gmxExchangeRouter: process.env.GMX_EXCHANGE_ROUTER || '0x7C68C7866A64FA2160F78EEaE12217FFbf871fa8',
-  },
-  optimism: {
-    name: 'Optimism',
-    chainId: 10,
-    rpcUrl: process.env.OPTIMISM_RPC || 'https://mainnet.optimism.io',
-    gmxRouter: '',
-    gmxReader: '',
-    gmxDataStore: '',
-    gmxExchangeRouter: '',
-  },
-  base: {
-    name: 'Base',
-    chainId: 8453,
-    rpcUrl: process.env.BASE_RPC || 'https://mainnet.base.org',
-    gmxRouter: '',
-    gmxReader: '',
-    gmxDataStore: '',
-    gmxExchangeRouter: '',
+    exchange: 'gmx',
   },
 };
 
@@ -87,7 +69,7 @@ function validatePrivateKey(key: string): string {
 }
 
 export function loadConfig(): BotConfig {
-  const networkName = process.env.DEFAULT_NETWORK || 'arbitrum';
+  const networkName = process.env.DEFAULT_NETWORK || 'hyperliquid';
   const network = NETWORKS[networkName];
   if (!network) {
     throw new Error(`Unknown network: ${networkName}`);

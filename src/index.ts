@@ -17,7 +17,7 @@ class TradingBot {
   private dataAggregator: MarketDataAggregator;
   private notificationService: NotificationService;
   private isRunning: boolean = false;
-  private symbols: string[] = ['ETH', 'ARB', 'LINK', 'SOL'];
+  private symbols: string[] = ['ETH', 'SOL', 'ARB', 'LINK', 'DOGE', 'WIF'];
   private loopIntervalMs: number = 60_000; // 1 minute main loop
   private lastTradeTime: Map<string, number> = new Map(); // Cooldown per symbol
   private tradeCooldownMs: number = 15 * 60_000; // 15 min between trades on same symbol
@@ -37,7 +37,7 @@ class TradingBot {
 
   async start(): Promise<void> {
     logger.info('='.repeat(50));
-    logger.info('  DEX Perpetual Futures Trading Bot');
+    logger.info('  Hyperliquid Perpetual Futures Trading Bot');
     logger.info('='.repeat(50));
     logger.info(`Mode:       ${this.config.tradingMode.toUpperCase()}`);
     logger.info(`Network:    ${this.config.network.name}`);
@@ -54,6 +54,9 @@ class TradingBot {
     }
 
     this.isRunning = true;
+
+    // Initialize Hyperliquid client (load market metadata)
+    await this.executionEngine.initialize();
 
     // Start dashboard
     const dashboard = new Dashboard({
@@ -89,7 +92,10 @@ class TradingBot {
   private async tradingLoop(): Promise<void> {
     // 1. Refresh market data
     logger.info('Refreshing market data...');
-    await this.dataAggregator.refreshAll();
+    await Promise.all([
+      this.dataAggregator.refreshAll(),
+      this.executionEngine.refreshAssetCtxs(),
+    ]);
     logger.info('Market data refreshed.');
 
     // 2. Check existing positions for exits

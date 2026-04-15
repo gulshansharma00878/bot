@@ -21,6 +21,9 @@ const COINGECKO_IDS: Record<string, string> = {
   'LINK': 'chainlink',
   'SOL': 'solana',
   'AVAX': 'avalanche-2',
+  'DOGE': 'dogecoin',
+  'WIF': 'dogwifcoin',
+  'PEPE': 'pepe',
 };
 
 // Rate-limit: max 10-30 req/min on free tier
