@@ -69,9 +69,58 @@ export class ExecutionEngine {
       }
 
       logger.info(`Effective trading balance: $${effectiveBalance.toFixed(2)}`);
+
+      // Sync existing positions from Hyperliquid so the bot tracks them on restart
+      await this.syncHlPositions(state);
     } catch (e) {
       logger.error(`Failed to initialize Hyperliquid client: ${e}`);
     }
+  }
+
+  /** Load existing HL positions into the in-memory tracker */
+  private async syncHlPositions(state: HlAccountState): Promise<void> {
+    const openPositions = state.assetPositions.filter(
+      (ap: any) => parseFloat(ap.position.szi) !== 0
+    );
+    if (openPositions.length === 0) return;
+
+    for (const ap of openPositions) {
+      const pos = ap.position;
+      const szi = parseFloat(pos.szi);
+      const entryPx = parseFloat(pos.entryPx || '0');
+      const side: Side = szi > 0 ? 'long' : 'short';
+      const size = Math.abs(szi);
+      const sizeUsd = size * entryPx;
+      const leverage = pos.leverage ? parseFloat(String(pos.leverage.value)) : 1;
+      const id = `hl_sync_${pos.coin}_${Date.now()}`;
+
+      const position: Position = {
+        id,
+        symbol: pos.coin,
+        side,
+        entryPrice: entryPx,
+        currentPrice: entryPx,
+        size,
+        sizeUsd,
+        leverage,
+        liquidationPrice: pos.liquidationPx ? parseFloat(pos.liquidationPx) : 0,
+        stopLoss: 0,
+        takeProfit: 0,
+        trailingStop: 0,
+        unrealizedPnl: parseFloat(pos.unrealizedPnl || '0'),
+        realizedPnl: 0,
+        status: 'open',
+        openTime: Date.now(),
+        strategy: 'synced',
+        txHash: `hl_existing_${pos.coin}`,
+      };
+
+      this.positions.set(id, position);
+      logger.info(
+        `Synced existing ${side.toUpperCase()} ${pos.coin}: ${size} tokens @ $${entryPx.toFixed(4)} (${leverage}x)`
+      );
+    }
+    logger.info(`Synced ${openPositions.length} existing position(s) from Hyperliquid`);
   }
 
   // =============================================
@@ -97,6 +146,28 @@ export class ExecutionEngine {
   getAvailableCoins(): string[] {
     if (!this.client || !this.metaLoaded) return [];
     return this.client.getAvailableCoins();
+  }
+
+  /** Fetch OHLCV candles from Hyperliquid (fast, free, has real volume) */
+  async getCandles(coin: string, interval: string, count: number): Promise<Array<{ t: number; o: number; h: number; l: number; c: number; v: number }>> {
+    if (!this.client) return [];
+    try {
+      const now = Date.now();
+      const intervalMs: Record<string, number> = {
+        '1h': 3600000, '4h': 14400000, '1d': 86400000,
+        '15m': 900000, '5m': 300000, '1m': 60000,
+      };
+      const ms = intervalMs[interval] || 3600000;
+      const startTime = now - ms * count;
+      const raw = await this.client.getCandles(coin, interval, startTime, now);
+      return (raw || []).map((c: any) => ({
+        t: c.t, o: parseFloat(c.o), h: parseFloat(c.h),
+        l: parseFloat(c.l), c: parseFloat(c.c), v: parseFloat(c.v),
+      }));
+    } catch (e) {
+      logger.error(`Failed to fetch HL candles for ${coin} ${interval}: ${e}`);
+      return [];
+    }
   }
 
   // =============================================

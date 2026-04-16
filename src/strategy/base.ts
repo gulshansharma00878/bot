@@ -16,9 +16,13 @@ export abstract class BaseStrategy {
     const trend4h = this.getSimpleTrend(candles4h, 20);
     const trend1d = this.getSimpleTrend(candles1d, 20);
 
+    // Require at least 2 of 3 timeframes to align (relaxed from all 3)
+    const bullCount = (trend1h > 0 ? 1 : 0) + (trend4h > 0 ? 1 : 0) + (trend1d > 0 ? 1 : 0);
+    const bearCount = (trend1h < 0 ? 1 : 0) + (trend4h < 0 ? 1 : 0) + (trend1d < 0 ? 1 : 0);
+
     return {
-      bullish: trend1h > 0 && trend4h > 0 && trend1d >= 0,
-      bearish: trend1h < 0 && trend4h < 0 && trend1d <= 0,
+      bullish: bullCount >= 2,
+      bearish: bearCount >= 2,
     };
   }
 

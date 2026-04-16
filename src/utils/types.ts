@@ -6,7 +6,7 @@ export type Side = 'long' | 'short';
 export type OrderType = 'market' | 'limit';
 export type PositionStatus = 'open' | 'closed' | 'liquidated';
 export type TradingMode = 'live' | 'paper';
-export type StrategyName = 'trend_following' | 'mean_reversion' | 'funding_arbitrage';
+export type StrategyName = 'trend_following' | 'mean_reversion' | 'funding_arbitrage' | 'synced';
 export type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
 
 export interface OHLCV {

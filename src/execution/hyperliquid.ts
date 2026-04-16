@@ -33,8 +33,9 @@ function actionHash(
 ): string {
   const packed = encode(action);
   const buf: number[] = [...packed];
-  // Append nonce as 8 big-endian bytes
-  for (let i = 7; i >= 0; i--) buf.push((nonce >>> (i * 8)) & 0xff);
+  // Append nonce as 8 big-endian bytes (use BigInt — nonce exceeds 32 bits)
+  const nonceBig = BigInt(nonce);
+  for (let i = 7; i >= 0; i--) buf.push(Number((nonceBig >> BigInt(i * 8)) & 0xFFn));
   // Vault flag
   if (!vaultAddress) {
     buf.push(0);

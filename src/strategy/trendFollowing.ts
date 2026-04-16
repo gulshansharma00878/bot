@@ -18,7 +18,7 @@ export class TrendFollowingStrategy extends BaseStrategy {
     this.params = {
       emaFast: params?.emaFast ?? 9,
       emaSlow: params?.emaSlow ?? 21,
-      volumeThreshold: params?.volumeThreshold ?? 1.2, // 1.2x average volume
+      volumeThreshold: params?.volumeThreshold ?? 0.8, // 0.8x average volume (crypto volume is uneven)
     };
   }
 
@@ -28,7 +28,7 @@ export class TrendFollowingStrategy extends BaseStrategy {
     const candles1d = state.candles['1d'];
 
     if (!candles1h || candles1h.length < (this.params.emaSlow! + 5)) {
-      logger.debug('TrendFollowing: Insufficient 1h data');
+      logger.debug(`TrendFollowing [${state.symbol}]: Insufficient 1h data (${candles1h?.length || 0} candles, need ${this.params.emaSlow! + 5})`);
       return null;
     }
 
@@ -55,25 +55,31 @@ export class TrendFollowingStrategy extends BaseStrategy {
     const bullishCross = prevFast <= prevSlow && currFast > currSlow;
     const bearishCross = prevFast >= prevSlow && currFast < currSlow;
 
-    // Trend continuation: require strong separation AND price pulling back toward fast EMA
-    // This prevents entering at extended prices that are about to revert
+    // Trend continuation: require separation AND price near fast EMA
     const emaSeparation = Math.abs(currFast - currSlow) / currentPrice;
-    const priceNearFastEma = Math.abs(currentPrice - currFast) / currentPrice < 0.005;
-    const bullishTrend = !bullishCross && currFast > currSlow && emaSeparation > 0.01 && priceNearFastEma;
-    const bearishTrend = !bearishCross && currFast < currSlow && emaSeparation > 0.01 && priceNearFastEma;
+    const priceNearFastEma = Math.abs(currentPrice - currFast) / currentPrice < 0.02;
+    const bullishTrend = !bullishCross && currFast > currSlow && emaSeparation > 0.002 && priceNearFastEma;
+    const bearishTrend = !bearishCross && currFast < currSlow && emaSeparation > 0.002 && priceNearFastEma;
 
     const isBullish = bullishCross || bullishTrend;
     const isBearish = bearishCross || bearishTrend;
+
+    logger.debug(`TrendFollowing [${state.symbol}]: EMA fast=${currFast.toFixed(4)} slow=${currSlow.toFixed(4)} sep=${emaSeparation.toFixed(5)} priceNearEma=${(Math.abs(currentPrice - currFast) / currentPrice).toFixed(5)} bullCross=${bullishCross} bearCross=${bearishCross} bullTrend=${bullishTrend} bearTrend=${bearishTrend}`);
 
     if (!isBullish && !isBearish) {
       return null;
     }
 
-    // Volume confirmation (skip if no volume data from CoinGecko)
-    const volumeConfirmed = avgVol > 0 ? currentVol >= avgVol * this.params.volumeThreshold! : true;
-    if (!volumeConfirmed) {
-      logger.debug('TrendFollowing: Volume not confirmed');
-      return null;
+    // Volume confirmation — only required for crossover signals (higher risk entry)
+    // Trend continuation signals already confirmed by EMA separation + multi-TF alignment
+    const isCrossover = bullishCross || bearishCross;
+    const prevVol = volumes[len - 2];
+    if (isCrossover) {
+      const volumeConfirmed = avgVol > 0 ? prevVol >= avgVol * this.params.volumeThreshold! : true;
+      if (!volumeConfirmed) {
+        logger.debug(`TrendFollowing [${state.symbol}]: Crossover volume not confirmed (prev=${prevVol.toFixed(2)} < ${(avgVol * this.params.volumeThreshold!).toFixed(2)})`);
+        return null;
+      }
     }
 
     // Multi-timeframe alignment
@@ -84,11 +90,11 @@ export class TrendFollowingStrategy extends BaseStrategy {
     );
 
     if (isBullish && !alignment.bullish) {
-      logger.debug('TrendFollowing: Bullish signal but no multi-TF alignment');
+      logger.debug(`TrendFollowing [${state.symbol}]: Bullish signal but no multi-TF alignment`);
       return null;
     }
     if (isBearish && !alignment.bearish) {
-      logger.debug('TrendFollowing: Bearish signal but no multi-TF alignment');
+      logger.debug(`TrendFollowing [${state.symbol}]: Bearish signal but no multi-TF alignment`);
       return null;
     }
 
@@ -108,7 +114,6 @@ export class TrendFollowingStrategy extends BaseStrategy {
 
     // Confidence: crossovers > trend continuation
     const crossoverStrength = Math.abs(currFast - currSlow) / currentPrice;
-    const isCrossover = bullishCross || bearishCross;
     const confidence = Math.min(0.9, (isCrossover ? 0.6 : 0.45) + crossoverStrength * 80);
 
     const signal: TradeSignal = {

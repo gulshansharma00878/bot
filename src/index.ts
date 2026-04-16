@@ -3,7 +3,7 @@ import { logger } from './utils/logger';
 import { StrategyEngine } from './strategy';
 import { RiskManager } from './risk/manager';
 import { ExecutionEngine } from './execution/engine';
-import { MarketDataAggregator } from './data/aggregator';
+import { MarketDataAggregator, setExecutionEngine } from './data/aggregator';
 import { NotificationService } from './notifications/service';
 import { Dashboard } from './dashboard/server';
 import { StrategyName, Position, TradeSignal } from './utils/types';
@@ -110,6 +110,9 @@ class TradingBot {
 
     // Initialize Hyperliquid client (load market metadata)
     await this.executionEngine.initialize();
+
+    // Connect aggregator to Hyperliquid for fast candle data
+    setExecutionEngine(this.executionEngine);
 
     // Start dashboard
     const dashboard = new Dashboard({

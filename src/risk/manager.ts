@@ -203,11 +203,13 @@ export class RiskManager {
   }
 
   private isStopLossHit(position: Position, price: number): boolean {
+    if (!position.stopLoss) return false;
     if (position.side === 'long') return price <= position.stopLoss;
     return price >= position.stopLoss;
   }
 
   private isTakeProfitHit(position: Position, price: number): boolean {
+    if (!position.takeProfit) return false;
     if (position.side === 'long') return price >= position.takeProfit;
     return price <= position.takeProfit;
   }
