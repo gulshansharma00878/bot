@@ -545,6 +545,17 @@ export function getDashboardHTML(): string {
     <div class="setting-group">
       <h4>Strategy</h4>
       <div class="setting-row">
+        <label>Preset</label>
+        <select id="s-preset" onchange="applyPreset(this.value)">
+          <option value="">Custom</option>
+          <option value="aggressive">Aggressive</option>
+          <option value="low_aggressive" selected>Low Aggressive (default)</option>
+          <option value="moderate">Moderate</option>
+          <option value="low_moderate">Low Moderate</option>
+          <option value="safe">Safe</option>
+        </select>
+      </div>
+      <div class="setting-row">
         <label>Active Strategy</label>
         <select id="s-strategy"></select>
       </div>
@@ -655,6 +666,7 @@ export function getDashboardHTML(): string {
   <div class="settings-actions">
     <button class="btn btn-primary" id="save-settings-btn" onclick="saveSettings()">Save Settings</button>
     <button class="btn btn-secondary" onclick="loadSettings()">Reset to Current</button>
+    <button class="btn btn-secondary" onclick="applyPreset('low_aggressive')">Reset to Default Preset</button>
     <span class="settings-msg" id="settings-msg"></span>
   </div>
 </div>
@@ -906,6 +918,88 @@ function drawChart(data) {
 // ---- Settings Management ----
 let settingsLoaded = false;
 
+const PRESETS = {
+  aggressive: {
+    maxRiskPerTrade: 0.05, maxDailyLoss: 0.15, maxLeverage: 20, defaultLeverage: 10,
+    stopLossPercent: 0.02, takeProfitPercent: 0.08, trailingStopPercent: 0.015,
+    confidenceThreshold: 0.4, maxConcurrentPositions: 8,
+    highVolThreshold: 0.05, highVolLeverage: 5, medVolThreshold: 0.03, medVolLeverage: 7,
+    lowVolThreshold: 0.01, lowVolLeverage: 10, minVolLeverage: 15,
+    loopIntervalSec: 30, cooldownMin: 5,
+  },
+  low_aggressive: {
+    maxRiskPerTrade: 0.03, maxDailyLoss: 0.10, maxLeverage: 15, defaultLeverage: 5,
+    stopLossPercent: 0.025, takeProfitPercent: 0.07, trailingStopPercent: 0.018,
+    confidenceThreshold: 0.5, maxConcurrentPositions: 6,
+    highVolThreshold: 0.05, highVolLeverage: 3, medVolThreshold: 0.03, medVolLeverage: 5,
+    lowVolThreshold: 0.01, lowVolLeverage: 7, minVolLeverage: 10,
+    loopIntervalSec: 45, cooldownMin: 10,
+  },
+  moderate: {
+    maxRiskPerTrade: 0.02, maxDailyLoss: 0.05, maxLeverage: 10, defaultLeverage: 3,
+    stopLossPercent: 0.03, takeProfitPercent: 0.06, trailingStopPercent: 0.02,
+    confidenceThreshold: 0.55, maxConcurrentPositions: 5,
+    highVolThreshold: 0.05, highVolLeverage: 2, medVolThreshold: 0.03, medVolLeverage: 3,
+    lowVolThreshold: 0.01, lowVolLeverage: 5, minVolLeverage: 7,
+    loopIntervalSec: 60, cooldownMin: 15,
+  },
+  low_moderate: {
+    maxRiskPerTrade: 0.015, maxDailyLoss: 0.04, maxLeverage: 7, defaultLeverage: 2,
+    stopLossPercent: 0.035, takeProfitPercent: 0.05, trailingStopPercent: 0.025,
+    confidenceThreshold: 0.6, maxConcurrentPositions: 4,
+    highVolThreshold: 0.04, highVolLeverage: 1, medVolThreshold: 0.025, medVolLeverage: 2,
+    lowVolThreshold: 0.01, lowVolLeverage: 3, minVolLeverage: 5,
+    loopIntervalSec: 90, cooldownMin: 20,
+  },
+  safe: {
+    maxRiskPerTrade: 0.01, maxDailyLoss: 0.03, maxLeverage: 5, defaultLeverage: 2,
+    stopLossPercent: 0.04, takeProfitPercent: 0.04, trailingStopPercent: 0.03,
+    confidenceThreshold: 0.7, maxConcurrentPositions: 3,
+    highVolThreshold: 0.03, highVolLeverage: 1, medVolThreshold: 0.02, medVolLeverage: 1,
+    lowVolThreshold: 0.01, lowVolLeverage: 2, minVolLeverage: 3,
+    loopIntervalSec: 120, cooldownMin: 30,
+  },
+};
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+  $('s-preset').value = name;
+  $('s-maxRiskPerTrade').value = p.maxRiskPerTrade;
+  $('s-maxDailyLoss').value = p.maxDailyLoss;
+  $('s-maxLeverage').value = p.maxLeverage;
+  $('s-defaultLeverage').value = p.defaultLeverage;
+  $('s-stopLossPercent').value = p.stopLossPercent;
+  $('s-takeProfitPercent').value = p.takeProfitPercent;
+  $('s-trailingStopPercent').value = p.trailingStopPercent;
+  $('s-confidenceThreshold').value = p.confidenceThreshold;
+  $('s-maxConcurrentPositions').value = p.maxConcurrentPositions;
+  $('s-highVolThreshold').value = p.highVolThreshold;
+  $('s-highVolLeverage').value = p.highVolLeverage;
+  $('s-medVolThreshold').value = p.medVolThreshold;
+  $('s-medVolLeverage').value = p.medVolLeverage;
+  $('s-lowVolThreshold').value = p.lowVolThreshold;
+  $('s-lowVolLeverage').value = p.lowVolLeverage;
+  $('s-minVolLeverage').value = p.minVolLeverage;
+  $('s-loopInterval').value = p.loopIntervalSec;
+  $('s-cooldown').value = p.cooldownMin;
+  showSettingsMsg('Preset "' + name.replace(/_/g, ' ') + '" applied — click Save to confirm', '#38bdf8');
+}
+
+function detectPreset(s) {
+  for (const [name, p] of Object.entries(PRESETS)) {
+    if (
+      Math.abs(s.maxRiskPerTrade - p.maxRiskPerTrade) < 0.0001 &&
+      Math.abs(s.maxDailyLoss - p.maxDailyLoss) < 0.0001 &&
+      s.maxLeverage === p.maxLeverage &&
+      s.defaultLeverage === p.defaultLeverage &&
+      Math.abs(s.confidenceThreshold - p.confidenceThreshold) < 0.0001 &&
+      s.maxConcurrentPositions === p.maxConcurrentPositions
+    ) return name;
+  }
+  return '';
+}
+
 async function loadSettings() {
   try {
     const s = await fetchJSON('/api/settings');
@@ -939,6 +1033,7 @@ async function loadSettings() {
     $('s-cooldown').value = Math.round(s.tradeCooldownMs / 60000);
     $('s-mode').textContent = s.tradingMode.toUpperCase();
     $('s-mode').style.color = s.tradingMode === 'live' ? '#dc2626' : '#f59e0b';
+    $('s-preset').value = detectPreset(s);
     settingsLoaded = true;
   } catch(e) {
     console.error('Failed to load settings:', e);
